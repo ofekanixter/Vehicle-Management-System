@@ -12,7 +12,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-drivenow}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -23,6 +23,8 @@ services:
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     env_file:
       - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-drivenow}:${POSTGRES_PASSWORD:-drivenow}@db:5432/${POSTGRES_DB:-drivenow}
     ports:
       - "8000:8000"
     depends_on:
@@ -32,4 +34,3 @@ services:
 volumes:
   pgdata:
     name: drivenow_persistent_db
-    external: true

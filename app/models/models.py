@@ -29,7 +29,9 @@ class Car(Base):
     model: Mapped[str] = mapped_column(String(100), nullable=False)
     year: Mapped[int] = mapped_column(Integer, nullable=False)
     status: Mapped[CarStatus] = mapped_column(
-        Enum(CarStatus, name="car_status"), default=CarStatus.AVAILABLE, nullable=False
+        Enum(CarStatus, name="car_status", values_callable=lambda enum_cls: [member.value for member in enum_cls]),
+        default=CarStatus.AVAILABLE,
+        nullable=False,
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -42,7 +44,7 @@ class Car(Base):
     )
 
     rentals: Mapped[List["Rental"]] = relationship(
-        "Rental", back_populates="car", cascade="all, delete-orphan"
+        "Rental", back_populates="car"
     )
 
     __table_args__ = (CheckConstraint("year >= 1950", name="check_year_min"),)
@@ -53,7 +55,7 @@ class Rental(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     car_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("cars.id", ondelete="CASCADE"), nullable=False
+        Integer, ForeignKey("cars.id"), nullable=False
     )
     customer_name: Mapped[str] = mapped_column(String(100), nullable=False)
     start_date: Mapped[datetime] = mapped_column(
