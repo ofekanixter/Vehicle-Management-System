@@ -1,9 +1,13 @@
 import pytest
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
 from app.core.database import Base, get_db
 from app.main import app
+from app.repositories.car_repo import CarRepository
+from app.repositories.rental_repo import RentalRepository
+from app.services.car_service import CarService
+from app.services.rental_service import RentalService
 
 def create_test_db_if_not_exists():
     db_url = settings.DATABASE_URL
@@ -52,12 +56,25 @@ def test_engine():
 def db_session(test_engine):
     connection = test_engine.connect()
     transaction = connection.begin()
-    
+
     Session = sessionmaker(bind=connection)
     session = Session()
-    
+
+    # Application code (services) calls session.commit(). Nest everything in a
+    # SAVEPOINT so a "commit" only ends the savepoint, not the outer `transaction`
+    # below — otherwise the first commit in a test would end the connection's
+    # transaction early and the final rollback() would be a no-op, leaking data
+    # into the real drivenow_test database instead of isolating each test.
+    session.begin_nested()
+
+    @event.listens_for(session, "after_transaction_end")
+    def _restart_savepoint(sess, trans):
+        if trans.nested and not trans._parent.nested:
+            sess.begin_nested()
+
     yield session
-    
+
+    event.remove(session, "after_transaction_end", _restart_savepoint)
     session.close()
     transaction.rollback()
     connection.close()
@@ -75,3 +92,39 @@ def client(db_session):
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
+
+
+class FakePublisher:
+    """Stands in for the real RabbitMQ publisher so
+    services can be tested without a broker running."""
+
+    def __init__(self):
+        self.events = []
+
+    def publish(self, routing_key, body):
+        self.events.append((routing_key, body))
+
+
+@pytest.fixture
+def fake_publisher():
+    return FakePublisher()
+
+
+@pytest.fixture
+def car_repo(db_session):
+    return CarRepository(db_session)
+
+
+@pytest.fixture
+def rental_repo(db_session):
+    return RentalRepository(db_session)
+
+
+@pytest.fixture
+def car_service(car_repo):
+    return CarService(car_repo)
+
+
+@pytest.fixture
+def rental_service(car_repo, rental_repo, fake_publisher):
+    return RentalService(car_repo, rental_repo, publisher=fake_publisher)
