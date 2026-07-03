@@ -32,6 +32,19 @@ def test_register_rental_unknown_car_raises(rental_service):
         rental_service.register_rental(car_id=999_999, customer_name="Ofek")
 
 
+def test_concurrent_rental_conflict_maps_to_domain_error(
+    car_service, rental_service, rental_repo
+):
+    car = car_service.add_car(model="Mazda 3", year=2022)
+    # Simulate a concurrent request that already inserted an active rental
+    # but whose car-status flip this transaction can't see yet: the service
+    # availability check passes, and the partial unique index fires instead.
+    rental_repo.create(car_id=car.id, customer_name="First")
+
+    with pytest.raises(CarNotAvailableError):
+        rental_service.register_rental(car_id=car.id, customer_name="Second")
+
+
 def test_end_rental_frees_car(car_service, rental_service):
     car = car_service.add_car(model="Mazda 3", year=2022)
     rental = rental_service.register_rental(car_id=car.id, customer_name="Ofek")

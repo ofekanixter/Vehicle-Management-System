@@ -76,7 +76,10 @@ def db_session(test_engine):
 
     event.remove(session, "after_transaction_end", _restart_savepoint)
     session.close()
-    transaction.rollback()
+    # A flush failure inside a test (e.g. the concurrent-rental IntegrityError
+    # path) already tears down the outer transaction via session.rollback().
+    if transaction.is_active:
+        transaction.rollback()
     connection.close()
 
 @pytest.fixture(scope="function")

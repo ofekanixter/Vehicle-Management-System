@@ -64,3 +64,7 @@ class CarRepository:
     def commit(self) -> None:
         self.session.commit()
         logger.debug("transaction committed")
+
+    def rollback(self) -> None:
+        self.session.rollback()
+        logger.debug("transaction rolled back")

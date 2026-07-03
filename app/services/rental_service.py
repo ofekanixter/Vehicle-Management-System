@@ -1,6 +1,8 @@
 import logging
 from typing import Optional
 
+from sqlalchemy.exc import IntegrityError
+
 from app.core.metrics import ONGOING_RENTALS, RENTALS_CREATED, set_cars_gauge
 from app.models.models import CarStatus, Rental
 from app.repositories.car_repo import CarRepository
@@ -38,9 +40,21 @@ class RentalService:
                 f"Car {car_id} is not available (status: {car.status.value})"
             )
 
-        rental = self.rental_repo.create(car_id=car_id, customer_name=customer_name)
-        self.car_repo.update_status(car, CarStatus.RENTED)
-        self.rental_repo.commit()
+        try:
+            rental = self.rental_repo.create(car_id=car_id, customer_name=customer_name)
+            self.car_repo.update_status(car, CarStatus.RENTED)
+            self.rental_repo.commit()
+        except IntegrityError:
+            # The one_active_rental_per_car index caught a rental this
+            # transaction couldn't see (concurrent request) — the DB safety
+            # net held, so answer 409 like any other availability conflict.
+            self.rental_repo.rollback()
+            logger.warning(
+                "rejected rental for car %s: concurrent active rental", car_id
+            )
+            raise CarNotAvailableError(
+                f"Car {car_id} is not available (already has an active rental)"
+            )
         RENTALS_CREATED.inc()
         ONGOING_RENTALS.set(self.rental_repo.count_active())
         set_cars_gauge(self.car_repo.count_by_status())
