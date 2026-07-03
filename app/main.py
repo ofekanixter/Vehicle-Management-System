@@ -36,9 +36,12 @@ async def lifespan(app: FastAPI):
     yield
 
 
+# DEBUG only controls log verbosity (see setup_logging above). It is
+# deliberately NOT passed to FastAPI(debug=...): that would swap in
+# Starlette's debug middleware, which returns raw tracebacks to HTTP
+# clients instead of the clean JSON 500 from our exception handler.
 app = FastAPI(
     title=settings.APP_NAME,
-    debug=settings.DEBUG,
     version="1.0.0",
     lifespan=lifespan,
 )
