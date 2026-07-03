@@ -44,6 +44,16 @@ class RentalRepository:
         logger.debug("rental query returned %d rental(s) (active=%s)", len(rentals), active)
         return rentals
 
+    def count_active(self) -> int:
+        count = self.session.query(Rental).filter(Rental.end_date.is_(None)).count()
+        logger.debug("active rental count: %d", count)
+        return count
+
+    def count_all(self) -> int:
+        count = self.session.query(Rental).count()
+        logger.debug("total rental count: %d", count)
+        return count
+
     def end(self, rental: Rental) -> Rental:
         rental.end_date = datetime.now(timezone.utc)
         self.session.flush()

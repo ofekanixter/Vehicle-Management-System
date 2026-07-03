@@ -1,6 +1,7 @@
 import logging
 from typing import Optional
 
+from app.core.metrics import set_cars_gauge
 from app.models.models import Car, CarStatus
 from app.repositories.car_repo import CarRepository
 from app.services.exceptions import (
@@ -22,6 +23,7 @@ class CarService:
     def add_car(self, model: str, year: int) -> Car:
         car = self.car_repo.create(model=model, year=year)
         self.car_repo.commit()
+        set_cars_gauge(self.car_repo.count_by_status())
         logger.info("car %s added (model=%s, year=%s)", car.id, car.model, car.year)
         return car
 
@@ -55,6 +57,7 @@ class CarService:
             )
         car = self.car_repo.update_status(car, status)
         self.car_repo.commit()
+        set_cars_gauge(self.car_repo.count_by_status())
         logger.info("car %s status updated to %s", car.id, status.value)
         return car
 
@@ -81,4 +84,5 @@ class CarService:
             )
         self.car_repo.delete(car)
         self.car_repo.commit()
+        set_cars_gauge(self.car_repo.count_by_status())
         logger.info("car %s deleted", car_id)

@@ -1,6 +1,7 @@
 import logging
 from typing import Optional
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.models import Car, CarStatus, Rental
@@ -37,6 +38,14 @@ class CarRepository:
         self.session.flush()
         logger.debug("car %s status flushed to %s (pending commit)", car.id, status.value)
         return car
+
+    def count_by_status(self) -> dict:
+        rows = self.session.query(Car.status, func.count(Car.id)).group_by(Car.status).all()
+        counts = {status.value: 0 for status in CarStatus}
+        for status, count in rows:
+            counts[status.value] = count
+        logger.debug("car status counts: %s", counts)
+        return counts
 
     def has_rentals(self, car_id: int) -> bool:
         result = (

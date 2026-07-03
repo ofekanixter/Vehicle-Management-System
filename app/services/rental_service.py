@@ -1,6 +1,7 @@
 import logging
 from typing import Optional
 
+from app.core.metrics import ONGOING_RENTALS, RENTALS_CREATED, set_cars_gauge
 from app.models.models import CarStatus, Rental
 from app.repositories.car_repo import CarRepository
 from app.repositories.rental_repo import RentalRepository
@@ -40,6 +41,9 @@ class RentalService:
         rental = self.rental_repo.create(car_id=car_id, customer_name=customer_name)
         self.car_repo.update_status(car, CarStatus.RENTED)
         self.rental_repo.commit()
+        RENTALS_CREATED.inc()
+        ONGOING_RENTALS.set(self.rental_repo.count_active())
+        set_cars_gauge(self.car_repo.count_by_status())
         logger.info("rental %s created for car %s (customer=%s)", rental.id, car.id, customer_name)
 
         self._publish(
@@ -60,6 +64,8 @@ class RentalService:
         car = self.car_repo.get(rental.car_id)
         self.car_repo.update_status(car, CarStatus.AVAILABLE)
         self.rental_repo.commit()
+        ONGOING_RENTALS.set(self.rental_repo.count_active())
+        set_cars_gauge(self.car_repo.count_by_status())
         logger.info("rental %s ended for car %s", rental.id, car.id)
 
         self._publish("rental.ended", {"rental_id": rental.id, "car_id": car.id})
