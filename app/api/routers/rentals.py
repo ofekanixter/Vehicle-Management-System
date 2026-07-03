@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.events.publisher import EventPublisher
 from app.repositories.car_repo import CarRepository
 from app.repositories.rental_repo import RentalRepository
 from app.schemas.rental import RentalCreate, RentalRead
@@ -11,9 +12,11 @@ from app.services.rental_service import RentalService
 
 router = APIRouter(prefix="/rentals", tags=["Rentals"])
 
+_publisher = EventPublisher()
+
 
 def get_rental_service(db: Session = Depends(get_db)) -> RentalService:
-    return RentalService(CarRepository(db), RentalRepository(db))
+    return RentalService(CarRepository(db), RentalRepository(db), publisher=_publisher)
 
 
 @router.post("", response_model=RentalRead, status_code=status.HTTP_201_CREATED)
