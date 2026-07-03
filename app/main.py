@@ -63,8 +63,10 @@ async def log_requests(request: Request, call_next):
     response = await call_next(request)
     duration = time.perf_counter() - start
 
+    # Label by route template, never by raw URL: unknown paths (scanners,
+    # typos) would otherwise mint one metric series per unique URL.
     route = request.scope.get("route")
-    metric_path = route.path if route is not None else request.url.path
+    metric_path = route.path if route is not None else "unmatched"
     REQUEST_DURATION.labels(request.method, metric_path).observe(duration)
 
     logger.info(

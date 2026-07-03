@@ -13,6 +13,12 @@ def test_create_car_invalid_year_returns_422(client):
     assert response.status_code == 422
 
 
+def test_create_car_future_year_returns_422(client):
+    response = client.post("/cars", json={"model": "Mazda 3", "year": 3000})
+
+    assert response.status_code == 422
+
+
 def test_get_unknown_car_returns_404(client):
     response = client.get("/cars/999999")
 

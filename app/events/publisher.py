@@ -15,6 +15,7 @@ CONNECTION_TIMEOUT_SECONDS = 2
 class EventPublisher:
     def publish(self, routing_key: str, body: dict) -> None:
         try:
+            message = json.dumps(body).encode("utf-8")
             parameters = pika.URLParameters(settings.RABBITMQ_URL)
             parameters.socket_timeout = CONNECTION_TIMEOUT_SECONDS
             connection = pika.BlockingConnection(parameters)
@@ -26,7 +27,7 @@ class EventPublisher:
                 channel.basic_publish(
                     exchange=EXCHANGE_NAME,
                     routing_key=routing_key,
-                    body=json.dumps(body).encode("utf-8"),
+                    body=message,
                     properties=pika.BasicProperties(
                         content_type="application/json", delivery_mode=2
                     ),
@@ -35,6 +36,9 @@ class EventPublisher:
             finally:
                 connection.close()
         except Exception:
+            # The rental itself already succeeded — a lost event must never
+            # fail the request, so log (the traceback says whether the cause
+            # was the broker or a bad payload) and move on.
             logger.warning(
-                "rabbitmq unreachable, event dropped (routing_key=%s)", routing_key, exc_info=True
+                "failed to publish event, dropped (routing_key=%s)", routing_key, exc_info=True
             )

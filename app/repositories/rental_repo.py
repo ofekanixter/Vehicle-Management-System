@@ -25,15 +25,6 @@ class RentalRepository:
         logger.debug("rental %s lookup: %s", rental_id, "found" if rental else "not found")
         return rental
 
-    def get_active_for_car(self, car_id: int) -> Optional[Rental]:
-        rental = (
-            self.session.query(Rental)
-            .filter(Rental.car_id == car_id, Rental.end_date.is_(None))
-            .first()
-        )
-        logger.debug("active rental lookup for car %s: %s", car_id, "found" if rental else "not found")
-        return rental
-
     def list(self, active: Optional[bool] = None) -> list[Rental]:
         query = self.session.query(Rental)
         if active is True:
