@@ -1,6 +1,7 @@
 import pytest
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import sessionmaker
+from app.api.routers.rentals import get_publisher
 from app.core.config import settings
 from app.core.database import Base, get_db
 from app.main import app
@@ -90,7 +91,12 @@ def client(db_session):
         finally:
             pass
             
+    # API tests must not publish real events to the shared broker —
+    # swap the RabbitMQ publisher for an in-memory fake.
+    fake = FakePublisher()
+
     app.dependency_overrides[get_db] = _get_db_override
+    app.dependency_overrides[get_publisher] = lambda: fake
     from fastapi.testclient import TestClient
     with TestClient(app) as c:
         yield c

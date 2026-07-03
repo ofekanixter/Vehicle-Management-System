@@ -15,8 +15,15 @@ router = APIRouter(prefix="/rentals", tags=["Rentals"])
 _publisher = EventPublisher()
 
 
-def get_rental_service(db: Session = Depends(get_db)) -> RentalService:
-    return RentalService(CarRepository(db), RentalRepository(db), publisher=_publisher)
+def get_publisher() -> EventPublisher:
+    return _publisher
+
+
+def get_rental_service(
+    db: Session = Depends(get_db),
+    publisher: EventPublisher = Depends(get_publisher),
+) -> RentalService:
+    return RentalService(CarRepository(db), RentalRepository(db), publisher=publisher)
 
 
 @router.post("", response_model=RentalRead, status_code=status.HTTP_201_CREATED)
