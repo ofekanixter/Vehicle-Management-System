@@ -16,26 +16,46 @@ RECONNECT_DELAY_SECONDS = 5
 
 def handle_message(channel, method, properties, body):
     routing_key = method.routing_key
-    payload = json.loads(body)
+    try:
+        payload = json.loads(body)
 
-    if routing_key == "rental.created":
-        logger.info(
-            "would send receipt to customer %s for rental %s",
-            payload.get("customer"),
-            payload.get("rental_id"),
+        if routing_key == "rental.created":
+            logger.info(
+                "would send receipt to customer %s for rental %s",
+                payload.get("customer"),
+                payload.get("rental_id"),
+            )
+        elif routing_key == "rental.ended":
+            logger.info(
+                "would send rental-ended confirmation for rental %s", payload.get("rental_id")
+            )
+        else:
+            logger.info("received unhandled event %s: %s", routing_key, payload)
+    except Exception:
+        # A message that always fails would otherwise be redelivered forever
+        # (poison message) — discard it instead of requeueing.
+        logger.error(
+            "failed to process message (routing_key=%s), discarding", routing_key, exc_info=True
         )
-    elif routing_key == "rental.ended":
-        logger.info(
-            "would send rental-ended confirmation for rental %s", payload.get("rental_id")
-        )
-    else:
-        logger.info("received unhandled event %s: %s", routing_key, payload)
+        channel.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
+        return
 
     channel.basic_ack(delivery_tag=method.delivery_tag)
 
 
+def _close_quietly(connection) -> None:
+    # Abandoning a live connection would leave a zombie consumer holding
+    # unacked messages on the broker until its heartbeat times out.
+    if connection is not None and connection.is_open:
+        try:
+            connection.close()
+        except Exception:
+            logger.debug("error while closing rabbitmq connection", exc_info=True)
+
+
 def run() -> None:
     while True:
+        connection = None
         try:
             connection = pika.BlockingConnection(pika.URLParameters(settings.RABBITMQ_URL))
             channel = connection.channel()
@@ -51,11 +71,15 @@ def run() -> None:
             channel.start_consuming()
         except KeyboardInterrupt:
             logger.info("worker shutting down")
+            _close_quietly(connection)
             break
         except Exception:
             logger.warning(
-                "rabbitmq unreachable, retrying in %ss", RECONNECT_DELAY_SECONDS, exc_info=True
+                "rabbitmq connection failed, retrying in %ss",
+                RECONNECT_DELAY_SECONDS,
+                exc_info=True,
             )
+            _close_quietly(connection)
             time.sleep(RECONNECT_DELAY_SECONDS)
 
 
