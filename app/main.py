@@ -2,8 +2,8 @@ import logging
 import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
-from prometheus_client import make_asgi_app
+from fastapi import FastAPI, Request, Response
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from app.api.exception_handlers import register_exception_handlers
 from app.api.routers import cars, health, rentals
@@ -50,7 +50,11 @@ app.include_router(health.router)
 app.include_router(cars.router)
 app.include_router(rentals.router)
 register_exception_handlers(app)
-app.mount("/metrics", make_asgi_app())
+
+
+@app.get("/metrics", tags=["Monitoring"])
+def metrics():
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
 @app.middleware("http")
