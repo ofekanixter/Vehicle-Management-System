@@ -1,3 +1,4 @@
+import logging
 from typing import Optional
 
 from app.models.models import CarStatus, Rental
@@ -9,6 +10,8 @@ from app.services.exceptions import (
     RentalAlreadyEndedError,
     RentalNotFoundError,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class RentalService:
@@ -27,6 +30,9 @@ class RentalService:
         if car is None:
             raise CarNotFoundError(f"Car {car_id} not found")
         if car.status != CarStatus.AVAILABLE:
+            logger.warning(
+                "rejected rental for car %s: status is %s", car_id, car.status.value
+            )
             raise CarNotAvailableError(
                 f"Car {car_id} is not available (status: {car.status.value})"
             )
@@ -34,6 +40,7 @@ class RentalService:
         rental = self.rental_repo.create(car_id=car_id, customer_name=customer_name)
         self.car_repo.update_status(car, CarStatus.RENTED)
         self.rental_repo.commit()
+        logger.info("rental %s created for car %s (customer=%s)", rental.id, car.id, customer_name)
 
         self._publish(
             "rental.created",
@@ -46,18 +53,22 @@ class RentalService:
         if rental is None:
             raise RentalNotFoundError(f"Rental {rental_id} not found")
         if rental.end_date is not None:
+            logger.warning("rejected end of rental %s: already ended", rental_id)
             raise RentalAlreadyEndedError(f"Rental {rental_id} has already ended")
 
         self.rental_repo.end(rental)
         car = self.car_repo.get(rental.car_id)
         self.car_repo.update_status(car, CarStatus.AVAILABLE)
         self.rental_repo.commit()
+        logger.info("rental %s ended for car %s", rental.id, car.id)
 
         self._publish("rental.ended", {"rental_id": rental.id, "car_id": car.id})
         return rental
 
     def list_rentals(self, active: Optional[bool] = None) -> list[Rental]:
-        return self.rental_repo.list(active=active)
+        rentals = self.rental_repo.list(active=active)
+        logger.debug("list_rentals returned %d rental(s) (active=%s)", len(rentals), active)
+        return rentals
 
     def _publish(self, routing_key: str, body: dict) -> None:
         if self.publisher is not None:
