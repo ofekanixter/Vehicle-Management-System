@@ -48,12 +48,12 @@ class CarService:
                 f"Cannot set car status to '{status.value}' directly"
             )
         car = self.get_car(car_id)
-        if car.status == CarStatus.RENTED and status == CarStatus.MAINTENANCE:
+        if car.status == CarStatus.RENTED:
             logger.warning(
-                "rejected maintenance transition for car %s: active rental", car_id
+                "rejected status change for car %s: active rental", car_id
             )
             raise CarHasActiveRentalError(
-                f"Car {car_id} has an active rental and cannot be moved to maintenance"
+                f"Car {car_id} has an active rental; end the rental first"
             )
         car = self.car_repo.update_status(car, status)
         self.car_repo.commit()

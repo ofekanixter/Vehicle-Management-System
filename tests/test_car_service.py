@@ -2,6 +2,7 @@ import pytest
 
 from app.models.models import CarStatus
 from app.services.exceptions import (
+    CarHasActiveRentalError,
     CarHasRentalHistoryError,
     CarNotFoundError,
     InvalidStatusTransitionError,
@@ -54,3 +55,21 @@ def test_cannot_set_status_to_rented_directly(car_service):
 
     with pytest.raises(InvalidStatusTransitionError):
         car_service.update_status(car.id, CarStatus.RENTED)
+
+
+def test_cannot_free_rented_car_directly(car_service, rental_service):
+    car = car_service.add_car(model="Mazda 3", year=2022)
+    rental_service.register_rental(car_id=car.id, customer_name="Dana")
+
+    with pytest.raises(CarHasActiveRentalError):
+        car_service.update_status(car.id, CarStatus.AVAILABLE)
+
+    assert car_service.get_car(car.id).status == CarStatus.RENTED
+
+
+def test_cannot_move_rented_car_to_maintenance(car_service, rental_service):
+    car = car_service.add_car(model="Mazda 3", year=2022)
+    rental_service.register_rental(car_id=car.id, customer_name="Dana")
+
+    with pytest.raises(CarHasActiveRentalError):
+        car_service.update_status(car.id, CarStatus.MAINTENANCE)
