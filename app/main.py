@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from app.api.routers import health
+from app.api.exception_handlers import register_exception_handlers
+from app.api.routers import cars, health, rentals
 from app.core.config import settings
 from app.core.database import Base, engine
 from app.models.models import Car, Rental
@@ -21,6 +22,9 @@ app = FastAPI(
 )
 
 app.include_router(health.router)
+app.include_router(cars.router)
+app.include_router(rentals.router)
+register_exception_handlers(app)
 
 
 @app.get("/")

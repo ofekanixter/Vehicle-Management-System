@@ -25,9 +25,11 @@ class RentalService:
     def register_rental(self, car_id: int, customer_name: str) -> Rental:
         car = self.car_repo.get(car_id)
         if car is None:
-            raise CarNotFoundError(car_id)
+            raise CarNotFoundError(f"Car {car_id} not found")
         if car.status != CarStatus.AVAILABLE:
-            raise CarNotAvailableError(car_id)
+            raise CarNotAvailableError(
+                f"Car {car_id} is not available (status: {car.status.value})"
+            )
 
         rental = self.rental_repo.create(car_id=car_id, customer_name=customer_name)
         self.car_repo.update_status(car, CarStatus.RENTED)
@@ -42,9 +44,9 @@ class RentalService:
     def end_rental(self, rental_id: int) -> Rental:
         rental = self.rental_repo.get(rental_id)
         if rental is None:
-            raise RentalNotFoundError(rental_id)
+            raise RentalNotFoundError(f"Rental {rental_id} not found")
         if rental.end_date is not None:
-            raise RentalAlreadyEndedError(rental_id)
+            raise RentalAlreadyEndedError(f"Rental {rental_id} has already ended")
 
         self.rental_repo.end(rental)
         car = self.car_repo.get(rental.car_id)
