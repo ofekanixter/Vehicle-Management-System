@@ -1,0 +1,11 @@
+# Never bake secrets into the image — compose injects .env at runtime
+.env
+
+# Version control, local notes and logs don't belong in the image
+.git
+logs/
+
+# Python build/test artifacts
+__pycache__/
+*.pyc
+.pytest_cache/
